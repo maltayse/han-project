@@ -53,7 +53,7 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(nodes[sid]['effort']['value'], 'xhigh')
         self.assertIsNone(nodes[sid + ':a']['effort'])
         self.assertEqual(nodes[sid + ':a']['requestedEffort'], 'high')
-        self.assertEqual(nodes[sid + ':b']['status'], 'completed')
+        self.assertEqual(nodes[sid + ':b']['status'], 'ended')
         self.assertNotIn('params', json.dumps(result))
 
     def test_reused_pid_is_excluded(self):

@@ -7,6 +7,7 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import sys
 from urllib.parse import urlparse
 from collector import Collector
 
@@ -63,12 +64,16 @@ def main():
     p.add_argument('--claude-dir', type=Path, default=Path.home()/'.claude')
     p.add_argument('--open', action='store_true')
     p.add_argument('--demo', action='store_true', help='Show synthetic data without reading any Claude files')
+    p.add_argument('--state-dir',type=Path,help='Private han-project workflow state directory')
     args = p.parse_args()
     if args.demo:
         from demo import DemoCollector
         collector = DemoCollector()
     else:
-        collector = Collector(args.claude_dir)
+        sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
+        from han_runtime.store import Store
+        from han_runtime.telemetry import WorkflowCollector
+        collector = WorkflowCollector(Collector(args.claude_dir),Store(args.state_dir))
     handler = handler_for(collector)
     try:
         server = ThreadingHTTPServer(('127.0.0.1', args.port), handler)

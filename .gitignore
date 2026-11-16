@@ -10,3 +10,5 @@ __pycache__/
 docs/agent-work/
 *.jsonl
 *.key
+*.sqlite3
+*.sqlite3-*

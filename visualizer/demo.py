@@ -11,13 +11,13 @@ class DemoCollector:
             dict(id='demo-api',name='DEMO · API 테스트 팀',cwd='/demo/api',pid=0,status='idle'),
             dict(id='demo-design',name='DEMO · 디자인 실험실',cwd='/demo/design',pid=0,status='idle'),
         ]
-        def node(id, session, parent, name, model, effort, status, activity, kind='agent'):
+        def node(id, session, parent, name, model, effort, status, activity, kind='agent',role='coordinator'):
             observed = lambda value: dict(value=value,source='synthetic demo',at=stamp)
             return dict(id=id,sessionId=session,parentId=parent,name=name,kind=kind,status=status,
                         model=observed('claude-'+model+'-demo'),responseModel=observed('claude-'+model+'-demo'),
                         effort=observed(effort),requestedModel=model if kind=='agent' else None,
-                        requestedEffort=effort if kind=='agent' else None,agentType='han-'+('builder' if model=='sonnet' else 'reviewer'),
-                        task=name,activity=activity,lastAt=stamp,ended=status=='completed',
+                        requestedEffort=effort if kind=='agent' else None,agentType=role,
+                        task=name,activity=activity,lastAt=stamp,ended=status=='ended',
                         events=[dict(at=stamp,text=activity,kind='tool')])
         nodes = [node(s['id'],s['id'],None,s['name'],'opus','medium',s['status'],'작업을 나누고 결과를 통합합니다.','session') for s in sessions]
         roles = [
@@ -31,5 +31,16 @@ class DemoCollector:
             ('polish','sonnet','medium','모바일 화면 다듬기','Edit · 작은 화면 여백 조정','completed'),
         ]
         for key,model,effort,name,activity,status in roles:
-            nodes.append(node('demo-'+key,'demo-docs','demo-docs',name,model,effort,status,activity))
-        return dict(generatedAt=now,sessions=sessions,nodes=nodes,errors=[],root='synthetic-demo',version='1.0.0-demo')
+            role={'scout':'han-scout','guide':'han-scout','deep':'han-deep','reviewer':'han-reviewer'}.get(key,'han-builder')
+            n=node('demo-'+key,'demo-docs','demo-docs',name,model,effort,'ended' if status=='completed' else status,activity,role=role)
+            n['outcome']={'scout':'accepted','tests':'failed','docs':'ready','deep':'blocked','guide':'accepted','polish':'changes_requested'}.get(key,'pending')
+            nodes.append(n)
+        sessions.append(dict(id='demo-old',name='DEMO · 이전 담당 기록',cwd='/demo/api',pid=None,status='recorded',historical=True))
+        nodes.append(node('demo-old','demo-old',None,'DEMO · 이전 담당 기록','sonnet','medium','recorded','이전 세션의 인계 기록','session'))
+        inbox=[dict(id='attempt-'+n['id'],taskId='demo-task',sessionId='demo-docs',agentId=n['id'],agentType=n['agentType'],
+                    outcome=n['outcome'],summary=n['name'],evidence=[],source='synthetic demo') for n in nodes if n['kind']=='agent' and n['status']=='ended']
+        handoffs=[dict(id='demo-handoff',taskId='demo-task',kind='transfer',source='demo-docs',target='demo-design',
+                       phase='received',version=1,created=now,title='문서 사이트 담당 인계',nextSteps=['검증 근거 확인','기존 담당의 확정 후 진행']),
+                  dict(id='demo-old-handoff',taskId='demo-api-task',kind='transfer',source='demo-old',target='demo-api',
+                       phase='committed',version=1,created=now,title='이전 API 작업 인계',nextSteps=['인계 기록 확인'])]
+        return dict(generatedAt=now,sessions=sessions,nodes=nodes,inbox=inbox,handoffs=handoffs,tasks=[],workflowEvents=[],errors=[],root='synthetic-demo',version='1.1.0-demo')

@@ -3,10 +3,12 @@
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const state = {data:null, session:localStorage.getItem('observer.session'), node:null,
-  page:0, pending:false, paused:reducedMotion.matches, desks:[], lastFrame:0};
-const labels = {busy:'작업 중', idle:'입력 대기', completed:'완료',
+  page:0, pending:false, paused:reducedMotion.matches, desks:[], lastFrame:0, seenInbox:new Set()};
+const labels = {busy:'작업 중', idle:'입력 대기', ended:'실행 종료', recorded:'이전 담당 기록 · 실행 미확인',
   'response-ended':'응답 종료', observed:'활동 관측 · 실행 미확인', unknown:'상태 미확인'};
 const colors = {fable:'#658a68', opus:'#c77852', sonnet:'#628f9f', haiku:'#9785b1', unknown:'#89917c'};
+const roles = {'han-scout':'탐색 · Scout','han-builder':'구현 · Builder','han-deep':'심층 분석 · Deep','han-reviewer':'독립 검토 · Reviewer','han-advisor':'설계 자문 · Advisor',coordinator:'코디네이터'};
+const outcomes = {pending:'결과 대기',ready:'검토 대기',blocked:'진행 차단',failed:'검증 실패',changes_requested:'보완 요청',accepted:'수락 완료'};
 
 function el(tag, cls, text) {
   const e=document.createElement(tag);
@@ -40,7 +42,7 @@ function date(t) {
   return isNaN(d)?String(t):d.toLocaleTimeString('ko-KR',{hour12:false});
 }
 function selectSession(id) {
-  state.session=id; state.node=id; state.page=0;
+  state.session=id; state.node=id; state.page=0;state.workflowSelection=null;
   localStorage.setItem('observer.session',id); render();
 }
 function field(parent,label,value,source) {
@@ -65,7 +67,7 @@ function person(c,x,y,color,frame=0,working=false,done=false) {
 }
 function portrait(n) {
   const canvas=el('canvas','mini-person');canvas.width=32;canvas.height=44;
-  const c=canvas.getContext('2d');person(c,16,16,colors[family(n)],0,false,n.status==='completed');return canvas;
+  const c=canvas.getContext('2d');person(c,16,16,colors[family(n)],0,false,n.outcome==='accepted');return canvas;
 }
 function plant(c,x,y,big=false) {
   const s=big?1.4:1;c.save();c.translate(x,y);c.scale(s,s);
@@ -122,7 +124,7 @@ function desk(c,d,time) {
   rect(c,x+24,y-4,6,7,'#f1ebd5');rect(c,x+30,y-2,3,3,'#eee5cb');
   rect(c,x-28,y-2,11,15,'#efead6');rect(c,x-26,y+1,6,1,'#bdc3aa');rect(c,x-26,y+4,5,1,'#bdc3aa');
   rect(c,x-12,y+18,26,19,'#71846e');rect(c,x-9,y+16,20,15,'#8fa186');
-  person(c,x,y+8,colors[family(n)],frame,active,n.status==='completed');
+  person(c,x,y+8,colors[family(n)],frame,active,n.outcome==='accepted');
   if(n.id===state.node){rect(c,x-16,y+39,33,2,'#c77852');rect(c,x-3,y+43,8,2,'#c77852');}
   if(main){rect(c,x-2,y-53,3,10,'#bc946b');rect(c,x+1,y-53,15,8,'#d5a15f');}
 }
@@ -148,12 +150,12 @@ function station(n,x,y) {
   button.dataset.focusKey='desk:'+n.id;
   button.setAttribute('aria-label',`${n.kind==='session'?'메인 오케스트레이터':'하위 에이전트'}: ${n.name}, ${modelLabel(n)}, effort ${effortLabel(n)}, ${labels[n.status]||'미확인'}`);
   const bubble=el('span','bubble');
-  bubble.append(el('span','role',n.kind==='session'?'오케스트레이터':n.parentId?'연결된 동료':'부모 미확인'),
+  bubble.append(el('span','role',roles[n.agentType]||(n.kind==='session'?'코디네이터':'역할 미확인')),
     el('span','station-name',n.kind==='session'?'메인 지휘석':n.name),
     el('span','station-meta',modelLabel(n)+' · '+effortLabel(n)));
   bubble.append(el('span','task-bubble',n.activity||n.task||n.name));
-  button.append(bubble,el('span','station-state '+n.status,labels[n.status]||'미확인'));
-  button.onclick=()=>{state.node=n.id;renderOffice();inspect(n);};
+  button.append(bubble,el('span','station-state '+n.status,(labels[n.status]||'미확인')+(n.outcome?' · '+outcomes[n.outcome]:'')));
+  button.onclick=()=>{state.node=n.id;state.workflowSelection=null;renderOffice();inspect(n);};
   return button;
 }
 function inspect(n) {
@@ -161,6 +163,8 @@ function inspect(n) {
   if(!n){d.append(el('p','muted','표시할 에이전트가 없습니다.'));return;}
   const p=el('div','detail-portrait');p.append(portrait(n),el('span','badge '+n.status,labels[n.status]||'미확인'));
   d.append(p,el('h2','',n.name));
+  field(d,'역할',roles[n.agentType]||(n.kind==='session'?'코디네이터':n.agentType||'미확인'));
+  field(d,'작업 결과',outcomes[n.outcome]||'미확인 · 실행 종료는 성공을 의미하지 않습니다.',n.resultSource);
   field(d,'모델 · 최신 API 요청',n.model?.value,n.model&&n.model.source+' · '+date(n.model.at));
   field(d,'모델 · 최신 응답',n.responseModel?.value,n.responseModel&&n.responseModel.source+' · '+date(n.responseModel.at));
   field(d,'Effort · 관측값',n.effort?.value,n.effort&&n.effort.source+' · '+date(n.effort.at));
@@ -178,9 +182,9 @@ function renderOffice() {
   if(!state.data)return;
   const focus=focusedControl();
   const nodes=state.data.nodes.filter(n=>n.sessionId===state.session);
-  const agents=nodes.filter(n=>n.kind==='agent'&&($('completed').checked||n.status!=='completed'));
+  const agents=nodes.filter(n=>n.kind==='agent'&&($('completed').checked||!['ended','response-ended'].includes(n.status)));
   // Recent unfinished work goes first; the character keeps a stable desk within each snapshot.
-  agents.sort((a,b)=>(a.status==='completed')-(b.status==='completed')||String(b.lastAt||'').localeCompare(String(a.lastAt||''))||a.id.localeCompare(b.id));
+  agents.sort((a,b)=>(a.status==='ended')-(b.status==='ended')||String(b.lastAt||'').localeCompare(String(a.lastAt||''))||a.id.localeCompare(b.id));
   const pages=Math.max(1,Math.ceil(agents.length/6));state.page=Math.min(state.page,pages-1);
   const main=nodes.find(n=>n.kind==='session');
   const coords=[[135,257],[300,257],[465,257],[135,382],[300,382],[465,382]];
@@ -217,13 +221,53 @@ function render() {
     const info=el('span');info.append(el('strong','',s.name),el('small','',labels[s.status]||'상태 미확인'));b.append(portrait(n),info);b.onclick=()=>selectSession(s.id);$('sessions').append(b);}
   $('title').textContent=selected?.name||'조용한 사무실';$('cwd').textContent=selected?.cwd||'세션이 없거나 필터와 일치하지 않습니다.';
   const agents=data.nodes.filter(n=>n.sessionId===state.session&&n.kind==='agent');
-  $('summary').replaceChildren();$('summary').append(el('b','',agents.length),document.createTextNode('명의 동료'),el('div','',agents.filter(n=>n.status==='completed').length+'개 작업 완료'));
+  const accepted=(data.inbox||[]).filter(n=>n.sessionId===state.session&&n.outcome==='accepted').length;
+  $('summary').replaceChildren();$('summary').append(el('b','',agents.length),document.createTextNode('명의 동료'),el('div','',accepted+'개 결과 수락 · '+agents.filter(n=>n.status==='ended').length+'개 실행 종료'));
   if(!data.nodes.some(n=>n.id===state.node&&n.sessionId===state.session))state.node=state.session;
   renderOffice();inspect(data.nodes.find(n=>n.id===state.node));
   $('neighbors').replaceChildren();sessions.filter(s=>s.id!==state.session).forEach(s=>$('neighbors').append(neighbor(s)));
   if(sessions.length<2)$('neighbors').append(el('div','muted','다른 세션이 생기면 이곳에 표시됩니다.'));
+  renderWorkflow();
   $('errors').replaceChildren();if(data.errors.length)$('errors').append(el('div','error','일부 기록을 읽지 못했습니다.\n'+data.errors.join('\n')));
   restoreFocus(focus);
+}
+function renderWorkflow() {
+  const inbox=$('inbox'),handoffs=$('handoffs');inbox.replaceChildren();handoffs.replaceChildren();
+  const items=(state.data.inbox||[]).filter(r=>r.sessionId===state.session);
+  for(const r of items.slice().reverse()){
+    const card=el('button','letter '+r.outcome+(!state.seenInbox.has(r.id)&&!state.paused?' arrived':''));
+    card.dataset.focusKey='letter:'+r.id;state.seenInbox.add(r.id);
+    const icon=el('span','envelope','✉');const body=el('span','letter-body');
+    body.append(el('strong','',outcomes[r.outcome]||'결과 미확인'),el('span','',roles[r.agentType]||r.agentType),el('small','',r.summary));
+    card.append(icon,body);card.onclick=()=>{
+      state.workflowSelection='letter:'+r.id;
+      const d=$('detail');d.replaceChildren(el('h2','','결과 봉투'),el('span','badge '+r.outcome,outcomes[r.outcome]||'미확인'));
+      field(d,'역할',roles[r.agentType]||r.agentType);field(d,'시도 ID',r.id);field(d,'작업 ID',r.taskId);
+      d.append(el('div','detail-label','반환 요약'),el('div','prose',r.summary));
+      field(d,'근거',r.evidence.length+'개 파일',r.source);
+      for(const e of r.evidence)field(d,e.path,e.sha256,'기록 시 파일 해시 · 내용은 자동으로 열지 않습니다.');
+    };inbox.append(card);if(state.workflowSelection===card.dataset.focusKey)card.onclick();
+  }
+  if(!items.length)inbox.append(el('p','workflow-empty','아직 기록된 결과 봉투가 없습니다. /han-project에서 task와 Worker 반환을 기록하면 표시됩니다.'));
+  const transfers=(state.data.handoffs||[]).filter(h=>h.source===state.session||h.target===state.session);
+  const phaseNames={prepared:'인계 준비',received:'후임 수신 확인',committed:'담당 이전 확정',cancelled:'인계 취소',checkpoint:'같은 담당 체크포인트'};
+  for(const h of transfers.slice().reverse()){
+    const card=el('button','handoff-card '+h.phase);card.dataset.focusKey='handoff:'+h.id;
+    card.append(el('strong','',h.title),el('span','transfer-owners',h.source+' → '+(h.target||'후임 미지정')));
+    const timeline=el('span','transfer-timeline');const stages=h.kind==='checkpoint'?['checkpoint']:['prepared','received','committed'];
+    const current=stages.indexOf(h.phase);
+    stages.forEach((phase,i)=>timeline.append(el('span',i<=current?'reached':'',phaseNames[phase])));
+    card.append(timeline);if(h.phase==='cancelled')card.append(el('span','',phaseNames.cancelled));
+    card.onclick=()=>{
+      state.workflowSelection='handoff:'+h.id;
+      const d=$('detail');d.replaceChildren(el('h2','',h.title));field(d,'종류',h.kind==='checkpoint'?'체크포인트 · 담당 유지':'세션 간 담당 이전');
+      field(d,'단계',phaseNames[h.phase]);field(d,'인계 ID',h.id);field(d,'기존 담당',h.source);field(d,'후임',h.target||'미지정');
+      field(d,'원래 소유권 버전',String(h.version));d.append(el('div','detail-label','다음 행동'));
+      h.nextSteps.forEach(s=>d.append(el('p','prose',s)));
+      d.append(el('p','muted','준비와 수신은 담당 이전 확정이 아닙니다. 웹에서는 인계·세션 제어를 하지 않습니다.'));
+    };handoffs.append(card);if(state.workflowSelection===card.dataset.focusKey)card.onclick();
+  }
+  if(!transfers.length)handoffs.append(el('p','workflow-empty','인계 기록이 없습니다. 같은 폴더의 다른 세션을 후임으로 추측하지 않습니다.'));
 }
 async function poll() {
   if(state.pending)return;state.pending=true;
