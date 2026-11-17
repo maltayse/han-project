@@ -24,13 +24,13 @@
 
 설치기 테스트는 임시 디렉터리에서 실행하며 실제 사용자 설정에 설치하지 않습니다. 시각화 수집기는 합성 fixture로 모델/effort 구분, 중첩 관계, 불완전 행, 파일 축소와 PID 재사용을 확인합니다. 데모는 파일을 읽지 않는지 확인합니다. HTTP 테스트는 Host/Origin, 정적 자산 경로와 불허 경로를 확인합니다.
 
-실제 macOS 로그와 브라우저에서 세션 전환·완료 필터·페이지 이동·inspector·키보드 포커스·동작 줄이기·390px 레이아웃을 확인했습니다. 이 공개 패키지에서는 합성 데모를 별도 검증합니다. 다른 운영체제/Claude 버전에서의 실제 수집, 모든 모델 제공자의 호출 성공, 프롬프트 준수율과 비용 개선은 검증하지 않았습니다.
+실제 macOS 로그와 브라우저에서 세션 전환·완료 필터·페이지 이동·inspector·키보드 포커스·동작 줄이기·390px 레이아웃을 확인했습니다. 이 공개 패키지에서는 합성 데모를 별도 검증합니다. 다른 운영체제/Claude 버전에서의 실제 수집, 모든 모델 제공자의 호출 성공, 프롬프트 준수율과 비용 개선은 검증하지 않았습니다. 일부 모델의 실제 역할 호출과 새 인계 스킬에 대한 별도 결과는 QA.md에 기록합니다.
 
 ## 설치·제거
 
-설치는 bundled 파일 7개만 복사하며 다른 에이전트·스킬·설정을 수정하지 않습니다. 동일한 파일은 건너뛰고 충돌하면 쓰기 전에 실패합니다. `--force`는 다른 파일을 먼저 `han-project-backups/<UTC timestamp>/` 아래에 보존합니다. 설치 경로 밖으로 벗어나는 심볼릭 링크는 거부합니다.
+설치는 bundled 파일 12개만 복사하며 다른 에이전트·스킬·설정을 수정하지 않습니다. 동일한 파일은 건너뛰고 충돌하면 쓰기 전에 실패합니다. `--force`는 다른 파일을 먼저 `han-project-backups/<UTC timestamp>/` 아래에 보존합니다. 설치 경로 밖으로 벗어나는 심볼릭 링크는 거부합니다.
 
-제거하려면 설치한 Claude 디렉터리에서 `skills/han-project/SKILL.md`, `skills/han-handoff/SKILL.md`, `agents/han-{scout,builder,deep,reviewer,advisor}.md`를 확인해 삭제하세요. 직접 수정한 파일은 먼저 보관하고, 덮어쓰기 설치 전에 있던 파일은 백업에서 복원하세요. 삭제를 자동화하는 명령은 제공하지 않습니다.
+제거하려면 설치한 Claude 디렉터리에서 `skills/han-project/SKILL.md`, `skills/han-handoff/SKILL.md`, `skills/han-resume/SKILL.md`, `han-project-runtime/` 및 `agents/han-{scout,builder,deep,reviewer,advisor}.md`를 확인해 삭제하세요. 직접 수정한 파일은 먼저 보관하고, 덮어쓰기 설치 전에 있던 파일은 백업에서 복원하세요. 삭제를 자동화하는 명령은 제공하지 않습니다.
 
 ## 참고
 
@@ -38,3 +38,5 @@
 - [Claude Code subagents](https://code.claude.com/docs/en/sub-agents)
 - [모델과 effort 설정](https://code.claude.com/docs/en/model-config)
 - [Pixel Agents](https://github.com/pablodelucca/pixel-agents): 표현 방식 참고. 코드·이미지 에셋을 가져오지 않았습니다.
+
+구조화된 결과와 인계는 `han_runtime/`이 로컬 SQLite에 보관합니다. read-only telemetry adapter가 기존 native 관측값과 결합하며, 과거 세션은 실제 실행 중인 노드로 위장하지 않습니다. 상세 상태 전이·근거 보관·한계는 [WORKFLOW.md](WORKFLOW.md)에 설명합니다.

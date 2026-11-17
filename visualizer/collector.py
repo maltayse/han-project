@@ -168,7 +168,7 @@ class Collector:
                     main = nid == sid
                     status = session['status'] or 'unknown'
                     if not main:
-                        status = 'completed' if meta.get('finished') else ('response-ended' if t.data['ended'] else 'unknown')
+                        status = 'ended' if meta.get('finished') else ('response-ended' if t.data['ended'] else 'unknown')
                         if not meta.get('finished') and not t.data['ended'] and t.data['lastAt']:
                             # A timestamp is evidence of activity, not proof the agent is still running.
                             status = 'observed'

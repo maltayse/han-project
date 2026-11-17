@@ -33,7 +33,7 @@ python3 install.py --dry-run
 python3 install.py
 ```
 
-설치 대상은 `~/.claude/skills/han-project/`, `~/.claude/skills/han-handoff/`, `~/.claude/agents/han-*.md`의 **7개 파일**입니다. 인증정보, `settings.json`, 권한 모드, 모델 기본 설정을 변경하지 않습니다. 다른 내용의 파일이 이미 있으면 아무것도 설치하지 않고 중단합니다. 검토 후 `--force`를 쓰면 다른 파일을 백업하고 교체합니다.
+설치 대상은 `~/.claude/skills/han-project/`, `~/.claude/skills/han-handoff/`, `~/.claude/skills/han-resume/`, `~/.claude/han-project-runtime/`, `~/.claude/agents/han-*.md`의 **12개 파일** (스킬 3종·에이전트 5종·런타임 4개)입니다. 인증정보, `settings.json`, 권한 모드, 모델 기본 설정을 변경하지 않습니다. 다른 내용의 파일이 이미 있으면 아무것도 설치하지 않고 중단합니다. 검토 후 `--force`를 쓰면 다른 파일을 백업하고 교체합니다.
 
 특정 프로젝트에만 설치하려면:
 
@@ -41,7 +41,7 @@ python3 install.py
 python3 install.py --claude-dir /path/to/your-project/.claude
 ```
 
-새 Claude Code 세션을 열거나 `/agents`에서 에이전트를 다시 불러온 뒤, `/han-project`와 `han-*` 역할을 확인하세요. 스킬은 [Claude Code의 사용자/프로젝트 스킬 경로](https://code.claude.com/docs/en/skills)에, 에이전트는 [사용자/프로젝트 에이전트 경로](https://code.claude.com/docs/en/sub-agents)에 설치됩니다.
+새 Claude Code 세션을 열거나 `/agents`에서 에이전트를 다시 불러온 뒤, `/han-project`·`/han-handoff`·`/han-resume`와 `han-*` 역할을 확인하세요. 스킬은 [Claude Code의 사용자/프로젝트 스킬 경로](https://code.claude.com/docs/en/skills)에, 에이전트는 [사용자/프로젝트 에이전트 경로](https://code.claude.com/docs/en/sub-agents)에 설치됩니다.
 
 ### 2. 작업 지시
 
@@ -58,7 +58,9 @@ python3 install.py --claude-dir /path/to/your-project/.claude
 작업을 이어갈 문서가 필요하면:
 
 ```text
-/han-handoff docs/agent-work/my-task/handoff.md
+/han-handoff <task-id> checkpoint
+/han-handoff <task-id> transfer
+/han-resume <handoff-id>
 ```
 
 ### 3. 실제 세션을 사무실에서 보기
@@ -74,6 +76,8 @@ macOS에서는 `visualizer/launch.command`를 더블클릭해도 됩니다. 기�
 ```bash
 python3 visualizer/observer.py --claude-dir /path/to/.claude --port 8766 --open
 ```
+
+인계는 준비·후임 수신·기존 담당 확정으로 나뉘며, 문서를 만들거나 읽는 것만으로 담당이 바뀌지 않습니다. 결과 봉투·인계 타임라인·이전 담당 기록이 사무실에 표시됩니다. [역할과 인계 사용법](docs/WORKFLOW.md)에서 CLI와 인터록을 확인하세요.
 
 ## 팀 구성
 
@@ -99,6 +103,8 @@ python3 visualizer/observer.py --claude-dir /path/to/.claude --port 8766 --open
 - **옆 사무실:** 같은 컴퓨터의 다른 세션. 별도 세션을 부모·자식으로 추측해 연결하지 않습니다.
 - **트리 보기:** `/classic`에서 목록과 에이전트 관계를 확인합니다.
 
+Worker 실행이 끝났다는 뜻인 ‘실행 종료’와, 독립 검토 후 코디네이터가 확인한 ‘수락 완료’는 다릅니다. 실패·차단 결과도 별도로 표시됩니다.
+
 ‘활동 관측’은 **현재 실행 중이라는 뜻이 아닙니다.** 완료 기록이나 레지스트리 상태 외에는 확정할 수 없는 정보를 추정하지 않습니다. 움직임은 진행률을 나타내지 않습니다. 실제 `toolUseId`가 일치할 때만 부모를 연결하고, 확인되지 않으면 부모 미확인으로 남깁니다. OS의 동작 줄이기 설정과 움직임 끄기 버튼을 지원합니다.
 
 ## 호환성과 개인정보
@@ -119,12 +125,16 @@ python3 -m unittest discover -s tests -v
 
 설치 충돌·백업·심볼릭 링크, 증분 로그와 불완전 행, PID 재사용, 부모 연결, 모델/effort 구분, HTTP 접근 제한, 데모의 파일 미접근을 테스트합니다. 이 검증은 Claude가 실제 작업에서 지침을 따르거나 모델 호출에 성공함을 보장하지 않습니다. 자세한 한계는 [설계와 검증](docs/ARCHITECTURE.md)을 참고하세요.
 
+모델 5종 역할 호출과 실제 비-fork Agent 라우팅도 별도 QA했습니다. 실효 effort와 모든 행동 준수까지 증명한 것은 아닙니다. [실제 모델 QA 결과와 한계](docs/QA.md)를 확인하세요.
+
 ## 파일 구성
 
 ```text
-skills/          han-project, han-handoff 원본 스킬
+skills/          han-project, han-handoff, han-resume 스킬
 agents/          역할별 에이전트 5종
 visualizer/      Python 서버, 수집기, 픽셀 사무실, 가상 데모
+han_runtime/     원자적 소유권·근거·인계 상태
+han.py           모델 호출 없는 작업/인계 CLI
 install.py       기존 설정을 보존하는 설치기
 tests/           설치기 테스트
 ```

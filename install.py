@@ -10,12 +10,18 @@ FILES = (
     'skills/han-project/SKILL.md', 'skills/han-handoff/SKILL.md',
     'agents/han-scout.md', 'agents/han-builder.md', 'agents/han-deep.md',
     'agents/han-reviewer.md', 'agents/han-advisor.md',
+    'skills/han-resume/SKILL.md',
+    'han-project-runtime/han.py',
+    'han-project-runtime/han_runtime/__init__.py',
+    'han-project-runtime/han_runtime/store.py',
+    'han-project-runtime/han_runtime/telemetry.py',
 )
+SOURCES = {name: name.removeprefix('han-project-runtime/') for name in FILES if name.startswith('han-project-runtime/')}
 
 
 def install(target, *, force=False, dry_run=False):
     target = Path(target).expanduser().resolve()
-    destinations = [(SOURCE / name, target / name) for name in FILES]
+    destinations = [(SOURCE / SOURCES.get(name,name), target / name) for name in FILES]
     # Validate every destination before making any changes.
     for src, dst in destinations:
         if not src.is_file():

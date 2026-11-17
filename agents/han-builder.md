@@ -17,7 +17,7 @@ Modify only assigned files. Run assigned checks using normal permissions. Report
 - For reasoning failure: inspect evidence, increase effort once if useful, then at most one model escalation. At 2 unsuccessful attempts on a task, stop and diagnose/replan rather than repeat. Infrastructure/auth failures are not reasoning failures.
 - Cheap deterministic checks use lint/typecheck/tests, not an LLM. Security/auth/data-loss review is high-risk, never a low-effort quick check.
 - Return concise findings with file/line evidence, actual commands/results, diff/commit when present, unresolved risks. Keep bulky evidence in task files, not the coordinator context. Do not claim tests passed unless executed.
-- Before final completion, independently review changed code and run integrated tests. Do not push, merge or deploy unless requested.
+- The coordinator owns final integration tests, independent review, result acceptance and handoff commit. Read-only roles request test runs and inspect evidence; they do not run commands or spawn reviewers. Never publish from a worker.
 - These are behavioral policies, not a hard budget or sandbox. Respect runtime limits and user approvals.
 
 ## Final handback contract
@@ -30,3 +30,6 @@ Use this compact order:
 - Risks/next: unresolved blockers, uncertainty and the next concrete action, or none.
 - Evidence: existing accessible artifact/log locations, or minimal relevant inline evidence if none exists. Never invent a path or claim a saved report without checking it.
 Only write-capable roles may save bulky detail, and only to an already authorized task path. Read-only roles keep their existing tools and cite existing evidence. Omit repeated task narration and bulk logs; preserve critical failure details, security/data-loss risks and uncertain operations even when the target is exceeded. The coordinator must verify critical evidence before integration.
+
+## Result and ownership
+Return your actual native agent ID when available, task ID and attempt ID supplied by the coordinator. End with ready/blocked/failed, changed files, actual verification and evidence. `ready` means awaiting coordinator review, never accepted or transferred. Do not mutate the workflow database or assume ownership from a handoff document. The coordinator records your result and independently verifies it. If resumed, keep the task ID and request a new attempt ID; do not overwrite previous failure evidence.
